@@ -24,7 +24,7 @@ with Path.open(BASE_DIR / "words.txt", 'r', encoding="utf-8") as f:
 def get_random_word() -> str:
     return random.choice(lines)
 
-async def get_user_markup(word:str, context: ContextTypes.DEFAULT_TYPE):
+async def get_user_markup(word:str, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     words = []
     word_without_context = word.split("(")[0].strip()
     for i in range(len(word_without_context)):
@@ -45,8 +45,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     word = get_random_word()
     reply_markup = await get_user_markup(word, context)
-
-    await update.message.reply_text(f"Слово: {word.upper()}", reply_markup=reply_markup)
+    if context.user_data.get("4_task_complety_all", -1) == -1 and context.user_data.get("4_task_complety_correct", -1) == -1 and context.user_data.get("4_task_streak", -1) == -1:
+        context.user_data["4_task_complety_correct"] = 0
+        context.user_data["4_task_complety_all"] = 0
+        context.user_data["4_task_streak"] = 0
+        context.user_data["4_task_best_streak"] = 0
+    await update.message.reply_text(f"Статистика:\nВсего решено: {context.user_data.get('4_task_complety_all', -1)}\nПравильно Решено: {context.user_data.get('4_task_complety_correct', -1)}\n Ваш стрик: {context.user_data.get('4_task_streak', -1)}\nЛучшая серия: {context.user_data.get('4_task_best_streak', -1)}\n\nСлово: {word.upper()}", reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -57,10 +61,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_choice = query.data
 
     text = ""
+    context.user_data["4_task_complety_all"] += 1
     if user_choice == word:
         text = f"✅ Правильно! {word}\n\n"
+        context.user_data["4_task_complety_correct"] += 1
+        context.user_data["4_task_streak"] += 1
     else:
         text = f"❌ Неверно, правильно: {word}\n\n"
+        if context.user_data["4_task_streak"]  > context.user_data["4_task_best_streak"]:
+            context.user_data["4_task_best_streak"] = context.user_data["4_task_streak"]
+        context.user_data["4_task_streak"] = 0
+
+    text += f"Статистика\nВсего решено {context.user_data.get('4_task_complety_all', -1)}\nПравильно решено: {context.user_data.get('4_task_complety_correct')}\nВаш стрик: {context.user_data.get('4_task_streak', -1)}\nЛучшая серия: {context.user_data.get('4_task_best_streak', -1)}\n\n"
     word = get_random_word()
     reply_markup = await get_user_markup(word, context)
     text += f"Слово: {word.upper()}\n"
